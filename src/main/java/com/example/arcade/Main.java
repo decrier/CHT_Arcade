@@ -18,8 +18,8 @@ public class Main extends Application {
     private double ballX = WIDTH / 2.0;
     private double ballY = HEIGHT / 2.0;
     private double ballR = 10; // радиус
-    private double ballVX = 200;
-    private double ballVY = 180;
+    private double ballVX = 300;
+    private double ballVY = -250;
 
     // ракетка
     private double paddleW = 100;
@@ -29,6 +29,11 @@ public class Main extends Application {
     private boolean moveLeft = false;
     private boolean moveRight = false;
     private double paddleSpeed = 300;
+
+    private int lives = 3;
+    private boolean gameOver = false;
+    private enum GameState { READY, RUNNING, GAME_OVER}
+    private GameState state = GameState.READY;
 
     @Override
     public void start(Stage stage) throws Exception {
@@ -52,12 +57,21 @@ public class Main extends Application {
             switch (e.getCode()) {
                 case LEFT, A -> moveLeft = true;
                 case RIGHT, D ->  moveRight = true;
+                case SPACE -> {
+                    if (state == GameState.READY) {
+                        state = GameState.RUNNING;
+                    } else if (state == GameState.GAME_OVER){
+                        restartGame();
+                    }
+                }
+                default -> {}
             }
         });
         scene.setOnKeyReleased(e -> {
             switch (e.getCode()) {
                 case LEFT, A -> moveLeft = false;
                 case RIGHT, D ->  moveRight = false;
+                default -> {}
             }
         });
         stage.setTitle("Arcade — Шаг 1: мяч и стены");
@@ -67,8 +81,13 @@ public class Main extends Application {
     }
 
     private void update(double dt) {
+        if (state != GameState.RUNNING) return;
+
+        // движение мяча
         ballX += ballVX * dt;
         ballY += ballVY * dt;
+
+        // отскоки от стен
         if (ballX + ballR > WIDTH) {
             ballX = WIDTH - ballR;
             ballVX = -Math.abs(ballVX);
@@ -77,14 +96,49 @@ public class Main extends Application {
             ballX = ballR;
             ballVX = Math.abs(ballVX);
         }
-        if (ballY + ballR > HEIGHT) {
-            ballY = HEIGHT - ballR;
-            ballVY = -Math.abs(ballVY);
-        }
         if (ballY - ballR < 0) {
             ballY = ballR;
             ballVY = Math.abs(ballVY);
         }
+
+        // столкновение с ракеткой
+        boolean intersectX = ballX >= paddleX && ballX <= paddleX + paddleW;
+        boolean intersectY = ballY + ballR >= paddleY && ballY + ballR <= paddleY + paddleH;
+        if (intersectX && intersectY && ballVY > 0) {
+            // 1. Выталкиваем мяч наверх
+            ballY = paddleY - ballR;
+
+            // 2. Считаем смещение от центра ракетки
+            double hitPos = (ballX - (paddleX + paddleW / 2.0)) / (paddleW / 2.0);
+
+            // 3. Задаем новую скорость
+            double speed = Math.sqrt(ballVX * ballVX + ballVY * ballVY);
+//            ballVX = speed * hitPos;
+//            ballVY = -Math.abs(speed * (1 - Math.abs(hitPos)));
+            ballVY = -Math.abs(ballVY);
+        }
+
+        // потеря мяча
+        if (ballY - ballR > HEIGHT) {
+            lives--;
+            System.out.println("Жизней осталось: " + lives);
+            if (lives > 0) {
+                resetBall();
+            } else {
+                state = GameState.GAME_OVER;
+                System.out.println("Игра окончена!");
+                ballVX = 0;
+                ballVY = 0;
+            }
+        }
+
+        // движение ракетки по нажатым клавишам
+        if (moveLeft) paddleX -= paddleSpeed * dt;
+        if (moveRight) paddleX += paddleSpeed * dt;
+
+        // ограничение ракетки по краям
+        if (paddleX < 0) paddleX = 0;
+        if (paddleX + paddleW > WIDTH) paddleX = WIDTH - paddleW;
     }
 
     private void render(GraphicsContext g) {
@@ -94,6 +148,29 @@ public class Main extends Application {
         g.fillOval(ballX - ballR, ballY - ballR, ballR * 2, ballR * 2);
         g.setFill(Color.web("#facc15"));
         g.fillRect(paddleX, paddleY, paddleW, paddleH);
+        g.setFill(Color.WHITE);
+        g.fillText("Жизни: " + lives, 10, 20);
+        if (state == GameState.READY) {
+            g.fillText("Нажми SPACE, чтобы начать", WIDTH / 2.0 - 80, HEIGHT / 2.0);
+        }
+        if (state == GameState.GAME_OVER) {
+            g.fillText("GAME OVER, Нажми SPACE, чтобы начать новую игру", WIDTH / 2.0 - 130, HEIGHT / 2.0);
+        }
+    }
+
+    private void resetBall(){
+        ballX = WIDTH / 2.0;
+        ballY = HEIGHT / 2.0;
+        ballVX = 200;
+        ballVY = 180;
+    }
+
+    private void restartGame() {
+        lives = 3;
+//        score = 0;
+        resetBall();
+        state = GameState.READY;
+        paddleX = (WIDTH - paddleW)/ 2.0;
     }
 
     public static void main(String[] args) {
