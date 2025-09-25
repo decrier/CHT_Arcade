@@ -1,5 +1,6 @@
 package com.example.arcade;
 
+import javafx.animation.AnimationTimer;
 import javafx.application.Application;
 import javafx.scene.Scene;
 import javafx.scene.canvas.Canvas;
@@ -14,6 +15,13 @@ public class Tetris extends Application {
     private static final int ROWS = 20;
     private static final int CELL = 30; // pixels
 
+    private int blockCol = COLS / 2;    // колонка блока
+    private int blockRow = 0;           // строка блока (0 = вверху)
+
+    // Добавь поля тайминга
+    private double fallInterval = 0.5;  // секунды между шагами падения
+    private double acc = 0;             // аккумулятор времени
+
     // Canvas
     private Canvas canvas = new Canvas(COLS * CELL, ROWS * CELL);
     private GraphicsContext g = canvas.getGraphicsContext2D();
@@ -21,12 +29,37 @@ public class Tetris extends Application {
     @Override
     public void start(Stage stage) throws Exception {
         Scene scene = new Scene(new StackPane(canvas));
-        stage.setTitle("Tetris");
+        stage.setTitle(this.getClass().getSimpleName());
         stage.setScene(scene);
         stage.setResizable(false);
         stage.show();
 
+        // игровой цикл с dt
+        final long[] last = { System.nanoTime() };
+        new AnimationTimer() {
+            @Override
+            public void handle(long now) {
+                double dt = (now - last[0]) / 1_000_000_000.0;
+                last[0] = now;
+                update(dt);
+                render();
+            }
+        }.start();
+    }
+
+    private void update(double dt) {
+        acc += dt;
+        if (acc >= fallInterval) {
+            acc -= fallInterval;
+            if (blockRow + 1 < ROWS) {
+                blockRow++;
+            }
+        }
+    }
+
+    private void render() {
         renderGrid();
+        drawCell(blockCol, blockRow, Color.web("#22d3ee"));
     }
 
     private void renderGrid() {
@@ -43,6 +76,11 @@ public class Tetris extends Application {
         for (int y = 0; y <= ROWS; y++) {
             g.strokeLine(0, y * CELL, CELL * COLS, y * CELL);
         }
+    }
+
+    private void drawCell(int col, int row, Color c){
+        g.setFill(c);
+        g.fillRect(col * CELL + 1, row * CELL + 1, CELL - 2, CELL - 2);
     }
 
     public static void main(String[] args) {
